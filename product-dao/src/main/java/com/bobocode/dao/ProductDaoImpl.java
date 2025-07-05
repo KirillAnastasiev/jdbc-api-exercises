@@ -6,7 +6,6 @@ import com.bobocode.model.Product;
 import javax.sql.DataSource;
 import java.sql.*;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
 public class ProductDaoImpl implements ProductDao {
@@ -15,6 +14,7 @@ public class ProductDaoImpl implements ProductDao {
             "(name, producer, price, expiration_date) " +
             "VALUES (?, ?, ?, ?)";
     public static final String FIND_ALL_PRODUCTS_SQL = "SELECT * FROM products";
+    public static final String FIND_PRODUCT_BY_ID_SQL = "SELECT * FROM products WHERE id = ?";
 
     private DataSource dataSource;
 
@@ -32,7 +32,6 @@ public class ProductDaoImpl implements ProductDao {
         } catch (SQLException e) {
             throw new DaoOperationException("Error saving product: " + product, e);
         }
-//        throw new UnsupportedOperationException("None of these methods will work unless you implement them!");// todo
     }
 
     @Override
@@ -50,7 +49,15 @@ public class ProductDaoImpl implements ProductDao {
 
     @Override
     public Product findOne(Long id) {
-        throw new UnsupportedOperationException("None of these methods will work unless you implement them!");// todo
+        try (Connection con = dataSource.getConnection()) {
+            PreparedStatement ps = con.prepareStatement(FIND_PRODUCT_BY_ID_SQL);
+            ps.setLong(1, id);
+            ResultSet rs = ps.executeQuery();
+            Product p = fetchProduct(id, rs);
+            return p;
+        } catch (SQLException e) {
+            throw new DaoOperationException("Error finding product with id = " + id, e);
+        }
     }
 
     @Override
@@ -88,15 +95,28 @@ public class ProductDaoImpl implements ProductDao {
 
     private void fillProductListWithResults(ResultSet rs, List<Product> products) throws SQLException {
         while (rs.next()) {
-            Product p = new Product();
-            p.setId(rs.getLong("id"));
-            p.setName(rs.getString("name"));
-            p.setProducer(rs.getString("producer"));
-            p.setPrice(rs.getBigDecimal("price"));
-            p.setExpirationDate(rs.getDate("expiration_date").toLocalDate());
-            p.setCreationTime(rs.getTimestamp("creation_time").toLocalDateTime());
+            Product p = fetchProductFromResultSet(rs);
             products.add(p);
         }
+    }
+
+    private Product fetchProduct(Long id, ResultSet rs) throws SQLException {
+        if (rs.next()) {
+            return fetchProductFromResultSet(rs);
+        } else {
+            throw new DaoOperationException("Product with id = " + id + " does not exist");
+        }
+    }
+
+    private Product fetchProductFromResultSet(ResultSet rs) throws SQLException {
+        Product p = new Product();
+        p.setId(rs.getLong("id"));
+        p.setName(rs.getString("name"));
+        p.setProducer(rs.getString("producer"));
+        p.setPrice(rs.getBigDecimal("price"));
+        p.setExpirationDate(rs.getDate("expiration_date").toLocalDate());
+        p.setCreationTime(rs.getTimestamp("creation_time").toLocalDateTime());
+        return p;
     }
 
 }
