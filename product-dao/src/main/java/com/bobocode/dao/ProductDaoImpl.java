@@ -7,14 +7,16 @@ import javax.sql.DataSource;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class ProductDaoImpl implements ProductDao {
 
     public static final String SAVE_PRODUCT_SQL = "INSERT INTO products " +
-            "(name, producer, price, expiration_date) " +
-            "VALUES (?, ?, ?, ?)";
+            "(name, producer, price, expiration_date) VALUES (?, ?, ?, ?)";
     public static final String FIND_ALL_PRODUCTS_SQL = "SELECT * FROM products";
     public static final String FIND_PRODUCT_BY_ID_SQL = "SELECT * FROM products WHERE id = ?";
+    public static final String UPDATE_PRODUCT_SQL = "UPDATE products SET name = ?, " +
+            "producer = ?, price = ?, expiration_date = ? WHERE id = ?";
 
     private DataSource dataSource;
 
@@ -26,8 +28,8 @@ public class ProductDaoImpl implements ProductDao {
     public void save(Product product) {
         try (Connection con = dataSource.getConnection()) {
             PreparedStatement ps = con.prepareStatement(SAVE_PRODUCT_SQL, Statement.RETURN_GENERATED_KEYS);
-            fillPreparedStatementWithData(ps, product);
-            executeUpdate(product, ps);
+            fillPreparedStatementWithDataReturningIndex(ps, product);
+            executeUpdate(ps, String.format("Product %s was not inserted", product));
             insertGeneratedKeyIntoProduct(ps, product);
         } catch (SQLException e) {
             throw new DaoOperationException("Error saving product: " + product, e);
@@ -62,7 +64,15 @@ public class ProductDaoImpl implements ProductDao {
 
     @Override
     public void update(Product product) {
-        throw new UnsupportedOperationException("None of these methods will work unless you implement them!");// todo
+        try (Connection con = dataSource.getConnection()) {
+            checkIfProductExists(product);
+            PreparedStatement ps = con.prepareStatement(UPDATE_PRODUCT_SQL);
+            int idx = fillPreparedStatementWithDataReturningIndex(ps, product);
+            ps.setLong(idx, product.getId());
+            executeUpdate(ps, String.format("Product with id = %d does not exist", product.getId()));
+        } catch (SQLException e) {
+            throw new DaoOperationException("Error updating product " + product, e);
+        }
     }
 
     @Override
@@ -70,17 +80,19 @@ public class ProductDaoImpl implements ProductDao {
         throw new UnsupportedOperationException("None of these methods will work unless you implement them!");// todo
     }
 
-    private void fillPreparedStatementWithData(PreparedStatement ps, Product product) throws SQLException {
-        ps.setString(1, product.getName());
-        ps.setString(2, product.getProducer());
-        ps.setBigDecimal(3, product.getPrice());
-        ps.setDate(4, Date.valueOf(product.getExpirationDate()));
+    private int fillPreparedStatementWithDataReturningIndex(PreparedStatement ps, Product product) throws SQLException {
+        int idx = 1;
+        ps.setString(idx++, product.getName());
+        ps.setString(idx++, product.getProducer());
+        ps.setBigDecimal(idx++, product.getPrice());
+        ps.setDate(idx++, Date.valueOf(product.getExpirationDate()));
+        return idx;
     }
 
-    private void executeUpdate(Product product, PreparedStatement ps) throws SQLException {
-        int inserted = ps.executeUpdate();
-        if (inserted == 0) {
-            throw new DaoOperationException("Product: " + product + " was not inserted");
+    private void executeUpdate(PreparedStatement ps, String errMsg) throws SQLException {
+        int updated = ps.executeUpdate();
+        if (updated == 0) {
+            throw new DaoOperationException(errMsg);
         }
     }
 
@@ -117,6 +129,12 @@ public class ProductDaoImpl implements ProductDao {
         p.setExpirationDate(rs.getDate("expiration_date").toLocalDate());
         p.setCreationTime(rs.getTimestamp("creation_time").toLocalDateTime());
         return p;
+    }
+
+    private void checkIfProductExists(Product product) {
+        if (Objects.isNull(product) || Objects.isNull(product.getId())) {
+            throw new DaoOperationException("Cannot find a product without ID");
+        }
     }
 
 }
