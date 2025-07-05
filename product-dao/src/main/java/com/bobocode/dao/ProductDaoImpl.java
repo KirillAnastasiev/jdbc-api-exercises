@@ -5,9 +5,12 @@ import com.bobocode.model.Product;
 
 import javax.sql.DataSource;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.sql.Date;
+import java.util.*;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
 
 public class ProductDaoImpl implements ProductDao {
 
@@ -40,11 +43,9 @@ public class ProductDaoImpl implements ProductDao {
     @Override
     public List<Product> findAll() {
         try (Connection con = dataSource.getConnection()) {
-            List<Product> products = new ArrayList<>();
             Statement s = con.createStatement();
             ResultSet rs = s.executeQuery(FIND_ALL_PRODUCTS_SQL);
-            fillProductListWithResults(rs, products);
-            return products;
+            return getProductStreamFromResultSet(rs).collect(Collectors.toList());
         } catch (SQLException e) {
             throw new DaoOperationException("Error while finding all products", e);
         }
@@ -113,13 +114,6 @@ public class ProductDaoImpl implements ProductDao {
         }
     }
 
-    private void fillProductListWithResults(ResultSet rs, List<Product> products) throws SQLException {
-        while (rs.next()) {
-            Product p = fetchProductFromResultSet(rs);
-            products.add(p);
-        }
-    }
-
     private Product fetchProduct(Long id, ResultSet rs) throws SQLException {
         if (rs.next()) {
             return fetchProductFromResultSet(rs);
@@ -146,6 +140,24 @@ public class ProductDaoImpl implements ProductDao {
         if (Objects.isNull(product.getId())) {
             throw new DaoOperationException("Cannot find a product without ID");
         }
+    }
+
+    private Stream<Product> getProductStreamFromResultSet(ResultSet rs) {
+        return StreamSupport.stream(new Spliterators.AbstractSpliterator<>(Long.MAX_VALUE, Spliterator.ORDERED) {
+            @Override
+            public boolean tryAdvance(Consumer<? super Product> action) {
+                try {
+                    if (rs.next()) {
+                        action.accept(fetchProductFromResultSet(rs));
+                        return true;
+                    } else {
+                        return false;
+                    }
+                } catch (SQLException e) {
+                    throw new DaoOperationException("Error getting all products", e);
+                }
+            }
+        }, false);
     }
 
 }
