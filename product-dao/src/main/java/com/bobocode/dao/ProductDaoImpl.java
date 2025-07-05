@@ -30,7 +30,7 @@ public class ProductDaoImpl implements ProductDao {
             executeUpdate(product, ps);
             insertGeneratedKeyIntoProduct(ps, product);
         } catch (SQLException e) {
-            throw new DaoOperationException("Error while saving Product: " + product, e);
+            throw new DaoOperationException("Error saving product: " + product, e);
         }
 //        throw new UnsupportedOperationException("None of these methods will work unless you implement them!");// todo
     }
