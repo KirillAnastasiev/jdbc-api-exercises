@@ -1,12 +1,19 @@
 package com.bobocode;
 
+import com.bobocode.util.FileReader;
+
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Statement;
 
 /**
  * {@link AccountDbInitializer} provides an API that allow to initialize (create) an Account table in the database
  */
 public class AccountDbInitializer {
+
+    public static final String DDL_FILE_NAME = "init_db.ddl";
+
     private DataSource dataSource;
 
     public AccountDbInitializer(DataSource dataSource) {
@@ -28,6 +35,18 @@ public class AccountDbInitializer {
      * @throws SQLException
      */
     public void init() throws SQLException {
-        throw new UnsupportedOperationException("It's your job to make it work!"); // todo
+        String sql = fetchCreateTableSql();
+        createTableFromSQL(sql);
+    }
+
+    private String fetchCreateTableSql() {
+        return FileReader.readWholeFileFromResources(DDL_FILE_NAME);
+    }
+
+    private void createTableFromSQL(String sql) throws SQLException {
+        try (Connection con = dataSource.getConnection()) {
+            Statement s = con.createStatement();
+            s.executeUpdate(sql);
+        }
     }
 }
