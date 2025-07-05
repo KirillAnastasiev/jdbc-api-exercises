@@ -17,6 +17,7 @@ public class ProductDaoImpl implements ProductDao {
     public static final String FIND_PRODUCT_BY_ID_SQL = "SELECT * FROM products WHERE id = ?";
     public static final String UPDATE_PRODUCT_SQL = "UPDATE products SET name = ?, " +
             "producer = ?, price = ?, expiration_date = ? WHERE id = ?";
+    public static final String REMOVE_PRODUCT_BY_ID = "DELETE FROM products WHERE id = ?";
 
     private DataSource dataSource;
 
@@ -77,7 +78,14 @@ public class ProductDaoImpl implements ProductDao {
 
     @Override
     public void remove(Product product) {
-        throw new UnsupportedOperationException("None of these methods will work unless you implement them!");// todo
+        try (Connection con = dataSource.getConnection()) {
+            checkIfProductExists(product);
+            PreparedStatement ps = con.prepareStatement(REMOVE_PRODUCT_BY_ID);
+            ps.setLong(1, product.getId());
+            executeUpdate(ps, String.format("Product with id = %d does not exist", product.getId()));
+        } catch (SQLException e) {
+            throw new DaoOperationException("Error removing product " + product);
+        }
     }
 
     private int fillPreparedStatementWithDataReturningIndex(PreparedStatement ps, Product product) throws SQLException {
@@ -132,7 +140,10 @@ public class ProductDaoImpl implements ProductDao {
     }
 
     private void checkIfProductExists(Product product) {
-        if (Objects.isNull(product) || Objects.isNull(product.getId())) {
+        if (Objects.isNull(product)) {
+            throw new DaoOperationException("Product is null");
+        }
+        if (Objects.isNull(product.getId())) {
             throw new DaoOperationException("Cannot find a product without ID");
         }
     }
